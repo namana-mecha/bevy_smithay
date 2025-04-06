@@ -1,0 +1,13 @@
+[package]
+name = "bevy_smithay"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+bevy = { version = "0.15.3", default-features = false, features = [
+    "bevy_window",
+] }
+cfg-if = "1.0.0"
+raw-window-handle = "0.6.2"
+smithay-client-toolkit = "0.19.2"
+wayland-backend = { version = "0.3.8", features = ["client_system"] }
