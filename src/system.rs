@@ -1,19 +1,20 @@
 use bevy::{
     ecs::{query::QueryFilter, system::SystemParamItem},
     prelude::*,
-    window::{RawHandleWrapper, WindowCreated, WindowWrapper},
+    window::{PrimaryWindow, RawHandleWrapper, WindowCreated},
 };
-use smithay_client_toolkit::reexports::client::{
-    Connection, QueueHandle, globals::GlobalList, protocol::wl_surface::WlSurface,
+use smithay_client_toolkit::{
+    reexports::client::{Connection, QueueHandle, globals::GlobalList},
+    shell::WaylandSurface,
 };
 
 use crate::{
-    CreateWindowParams, shells::layer_shell::LayerShellSettings, state::SmithayRunnerState,
+    CreateWindowParams, shells::layer_shell::LayerShellSettings, smithay_windows::SmithayWindows,
+    state::SmithayRunnerState,
 };
 pub(crate) fn create_windows<F: QueryFilter + 'static>(
     globals: &GlobalList,
     qh: &QueueHandle<SmithayRunnerState>,
-    surface: &WlSurface,
     conn: Connection,
     (
         mut commands,
@@ -35,14 +36,9 @@ pub(crate) fn create_windows<F: QueryFilter + 'static>(
             }
         };
 
-        smithay_window = smithay_windows.create_window(
-            entity,
-            window_settings,
-            globals,
-            qh,
-            conn.clone(),
-            surface.clone(),
-        );
+        commands.entity(entity).insert_if_new(PrimaryWindow);
+        smithay_window =
+            smithay_windows.create_window(entity, window_settings, globals, qh, conn.clone());
 
         let mut wrapper: Option<_> = None;
         if let Ok(handle_wrapper) = RawHandleWrapper::new(smithay_window) {
@@ -51,16 +47,40 @@ pub(crate) fn create_windows<F: QueryFilter + 'static>(
                 *handle_holder.0.lock().unwrap() = Some(handle_wrapper);
             }
         }
-        commands.entity(entity).insert(wrapper.unwrap());
+        commands
+            .entity(entity)
+            .insert(wrapper.unwrap())
+            .insert(window_settings.clone());
 
         info!("Window created!");
         window_created_events.send(WindowCreated { window: entity });
     }
 }
 
-pub(crate) fn changed_windows(mut changed_windows: Query<(Entity, &mut Window), Changed<Window>>) {
-    for (_entity, window) in &mut changed_windows {
-        println!("Changed window!");
-        println!("{:?}", window);
+#[allow(clippy::type_complexity)]
+pub(crate) fn changed_windows(
+    mut smithay_windows: NonSendMut<SmithayWindows>,
+    mut changed_windows: Query<
+        (Entity, &mut Window, &mut LayerShellSettings),
+        Or<(Changed<Window>, Changed<LayerShellSettings>)>,
+    >,
+) {
+    for (entity, _, layer_shell_settings) in &mut changed_windows {
+        let window_id = smithay_windows
+            .entity_to_smithay
+            .get(&entity)
+            .unwrap()
+            .clone();
+        let window = smithay_windows.windows.get_mut(&window_id).unwrap();
+        let surface = window.layer_surface();
+        surface.set_exclusive_zone(layer_shell_settings.exclusive_zone);
+        surface.set_size(layer_shell_settings.size.0, layer_shell_settings.size.1);
+        surface.set_margin(
+            layer_shell_settings.margin.0,
+            layer_shell_settings.margin.1,
+            layer_shell_settings.margin.2,
+            layer_shell_settings.margin.3,
+        );
+        surface.commit();
     }
 }

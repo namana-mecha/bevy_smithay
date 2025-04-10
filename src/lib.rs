@@ -29,6 +29,16 @@ impl Plugin for SmithayPlugin {
     }
 }
 
+trait AppSendEvent {
+    fn send(&mut self, event: impl Into<bevy::window::WindowEvent>);
+}
+
+impl AppSendEvent for Vec<bevy::window::WindowEvent> {
+    fn send(&mut self, event: impl Into<bevy::window::WindowEvent>) {
+        self.push(Into::<bevy::window::WindowEvent>::into(event));
+    }
+}
+
 pub type CreateWindowParams<'w, 's, F = ()> = (
     Commands<'w, 's>,
     Query<

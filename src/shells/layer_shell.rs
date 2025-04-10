@@ -1,4 +1,4 @@
-use bevy::{prelude::Resource, window::RawHandleWrapper};
+use bevy::prelude::{Component, Resource};
 use raw_window_handle::{
     DisplayHandle, HasDisplayHandle, HasWindowHandle, RawDisplayHandle, RawWindowHandle,
     WaylandDisplayHandle, WaylandWindowHandle, WindowHandle,
@@ -23,7 +23,7 @@ pub use smithay_client_toolkit::shell::wlr_layer::{Anchor, KeyboardInteractivity
 
 use crate::state::SmithayRunnerState;
 
-#[derive(Debug, Resource, Clone)]
+#[derive(Debug, Resource, Component, Clone)]
 pub struct LayerShellSettings {
     pub anchor: Anchor,
     pub size: (u32, u32),
@@ -49,6 +49,16 @@ impl Default for LayerShellSettings {
 pub struct LayerShellWindow {
     window: LayerSurface,
     conn: Connection,
+}
+
+impl LayerShellWindow {
+    pub fn layer_surface(&self) -> &LayerSurface {
+        &self.window
+    }
+
+    pub fn layer_surface_mut(&mut self) -> &mut LayerSurface {
+        &mut self.window
+    }
 }
 
 impl HasWindowHandle for LayerShellWindow {

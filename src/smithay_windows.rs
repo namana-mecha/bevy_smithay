@@ -1,15 +1,18 @@
 use bevy::{ecs::entity::EntityHashMap, prelude::*, window::WindowWrapper};
 use raw_window_handle::{HasDisplayHandle, HasWindowHandle};
-use smithay_client_toolkit::reexports::client::{
-    Connection, QueueHandle, globals::GlobalList, protocol::wl_surface::WlSurface,
+use smithay_client_toolkit::{
+    compositor::CompositorState,
+    reexports::client::{Connection, Proxy, QueueHandle, globals::GlobalList},
 };
 use std::collections::*;
+use wayland_backend::sys::client::ObjectId;
 
 use crate::{
     prelude::{LayerShellSettings, LayerShellWindow, create_window},
     state::SmithayRunnerState,
 };
 
+#[derive(Deref, DerefMut)]
 pub struct SmithayWindow(LayerShellWindow);
 impl HasDisplayHandle for SmithayWindow {
     fn display_handle(
@@ -27,22 +30,12 @@ impl HasWindowHandle for SmithayWindow {
     }
 }
 
-#[derive(Copy, Clone, Default, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub struct WindowId(usize);
-impl WindowId {
-    fn next(&mut self) -> Self {
-        self.0 += 1;
-        *self
-    }
-}
-
 #[derive(Default)]
 pub struct SmithayWindows {
-    pub windows: HashMap<WindowId, WindowWrapper<SmithayWindow>>,
-    pub entity_to_smithay: EntityHashMap<WindowId>,
-    pub smithay_to_entity: HashMap<WindowId, Entity>,
+    pub windows: HashMap<ObjectId, WindowWrapper<SmithayWindow>>,
+    pub entity_to_smithay: EntityHashMap<ObjectId>,
+    pub smithay_to_entity: HashMap<ObjectId, Entity>,
 
-    last_window_id: WindowId,
     _not_send_sync: core::marker::PhantomData<*const ()>,
 }
 
@@ -54,14 +47,20 @@ impl SmithayWindows {
         globals: &GlobalList,
         qh: &QueueHandle<SmithayRunnerState>,
         conn: Connection,
-        surface: WlSurface,
     ) -> &WindowWrapper<SmithayWindow> {
+        let compositor = CompositorState::bind(globals, qh).expect("faild to bind compositor");
+        let surface = compositor.create_surface(qh);
+        let window_id = surface.id();
+
         let smithay_window = SmithayWindow(create_window(globals, qh, surface, conn, settings));
-        let window_id = self.last_window_id.next();
-        self.entity_to_smithay.entry(entity).insert(window_id);
-        self.smithay_to_entity.entry(window_id).insert_entry(entity);
+        self.entity_to_smithay
+            .entry(entity)
+            .insert(window_id.clone());
+        self.smithay_to_entity
+            .entry(window_id.clone())
+            .insert_entry(entity);
         self.windows
-            .entry(window_id)
+            .entry(window_id.clone())
             .insert_entry(WindowWrapper::new(smithay_window))
             .into_mut()
     }

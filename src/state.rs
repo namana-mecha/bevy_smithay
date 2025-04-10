@@ -1,9 +1,11 @@
 use std::time::Duration;
 
-use bevy::{app::PluginsState, ecs::system::SystemState, prelude::*};
+use bevy::{
+    app::PluginsState, ecs::system::SystemState, prelude::*, window::WindowEvent as BevyWindowEvent,
+};
 
 use smithay_client_toolkit::{
-    compositor::{CompositorHandler, CompositorState},
+    compositor::CompositorHandler,
     delegate_compositor, delegate_output, delegate_registry, delegate_seat,
     output::{OutputHandler, OutputState},
     reexports::{
@@ -12,7 +14,7 @@ use smithay_client_toolkit::{
         client::{
             Connection,
             globals::registry_queue_init,
-            protocol::{wl_keyboard, wl_pointer, wl_touch},
+            protocol::{wl_keyboard, wl_pointer, wl_surface::WlSurface, wl_touch},
         },
     },
     registry::{ProvidesRegistryState, RegistryState},
@@ -20,8 +22,6 @@ use smithay_client_toolkit::{
     seat::{Capability, SeatHandler, SeatState},
 };
 
-#[allow(unused_imports)]
-use crate::handlers::prelude::*;
 use crate::{CreateWindowParams, system::create_windows};
 
 pub fn smithay_runner(mut app: App) -> AppExit {
@@ -42,9 +42,6 @@ pub fn smithay_runner(mut app: App) -> AppExit {
         .insert(loop_handle.clone())
         .expect("failed to insert wayland source to event loop");
 
-    let compositor = CompositorState::bind(&globals, &qh).expect("faild to bind compositor");
-    let surface = compositor.create_surface(&qh);
-
     let mut smithay_runner_state = SmithayRunnerState {
         registry_state: RegistryState::new(&globals),
         seat_state: SeatState::new(&globals, &qh),
@@ -54,7 +51,12 @@ pub fn smithay_runner(mut app: App) -> AppExit {
         pointer: None,
         touch: None,
 
+        active_keyboard_surface: None,
+
         app,
+        bevy_window_events: vec![],
+
+        active_touches: Default::default(),
     };
     let mut create_window = SystemState::<CreateWindowParams<Added<Window>>>::from_world(
         smithay_runner_state.world_mut(),
@@ -62,7 +64,6 @@ pub fn smithay_runner(mut app: App) -> AppExit {
     create_windows(
         &globals,
         &qh,
-        &surface,
         conn.clone(),
         create_window.get_mut(smithay_runner_state.world_mut()),
     );
@@ -86,12 +87,19 @@ pub struct SmithayRunnerState {
     output_state: OutputState,
 
     // Inputs
-    keyboard: Option<wl_keyboard::WlKeyboard>,
-    pointer: Option<wl_pointer::WlPointer>,
-    touch: Option<wl_touch::WlTouch>,
+    pub(crate) keyboard: Option<wl_keyboard::WlKeyboard>,
+    pub(crate) pointer: Option<wl_pointer::WlPointer>,
+    pub(crate) touch: Option<wl_touch::WlTouch>,
+
+    // Active Surfaces
+    pub(crate) active_keyboard_surface: Option<WlSurface>,
 
     // Bevy
     app: App,
+    pub(crate) bevy_window_events: Vec<BevyWindowEvent>,
+
+    // Touch
+    pub(crate) active_touches: std::collections::HashMap<i32, (Entity, Vec2)>,
 }
 
 impl SmithayRunnerState {
@@ -104,8 +112,107 @@ impl SmithayRunnerState {
     }
 
     pub fn run_app_update(&mut self) {
+        self.forward_bevy_events();
+
         if self.app.plugins_state() == PluginsState::Cleaned {
             self.app.update();
+        }
+    }
+
+    fn forward_bevy_events(&mut self) {
+        let buffered_events = self.bevy_window_events.drain(..).collect::<Vec<_>>();
+        let world = self.world_mut();
+
+        for winit_event in buffered_events.iter() {
+            match winit_event.clone() {
+                BevyWindowEvent::AppLifecycle(e) => {
+                    world.send_event(e);
+                }
+                BevyWindowEvent::CursorEntered(e) => {
+                    world.send_event(e);
+                }
+                BevyWindowEvent::CursorLeft(e) => {
+                    world.send_event(e);
+                }
+                BevyWindowEvent::CursorMoved(e) => {
+                    world.send_event(e);
+                }
+                BevyWindowEvent::FileDragAndDrop(e) => {
+                    world.send_event(e);
+                }
+                BevyWindowEvent::Ime(e) => {
+                    world.send_event(e);
+                }
+                BevyWindowEvent::RequestRedraw(e) => {
+                    world.send_event(e);
+                }
+                BevyWindowEvent::WindowBackendScaleFactorChanged(e) => {
+                    world.send_event(e);
+                }
+                BevyWindowEvent::WindowCloseRequested(e) => {
+                    world.send_event(e);
+                }
+                BevyWindowEvent::WindowCreated(e) => {
+                    world.send_event(e);
+                }
+                BevyWindowEvent::WindowDestroyed(e) => {
+                    world.send_event(e);
+                }
+                BevyWindowEvent::WindowFocused(e) => {
+                    world.send_event(e);
+                }
+                BevyWindowEvent::WindowMoved(e) => {
+                    world.send_event(e);
+                }
+                BevyWindowEvent::WindowOccluded(e) => {
+                    world.send_event(e);
+                }
+                BevyWindowEvent::WindowResized(e) => {
+                    world.send_event(e);
+                }
+                BevyWindowEvent::WindowScaleFactorChanged(e) => {
+                    world.send_event(e);
+                }
+                BevyWindowEvent::WindowThemeChanged(e) => {
+                    world.send_event(e);
+                }
+                BevyWindowEvent::MouseButtonInput(e) => {
+                    world.send_event(e);
+                }
+                BevyWindowEvent::MouseMotion(e) => {
+                    world.send_event(e);
+                }
+                BevyWindowEvent::MouseWheel(e) => {
+                    world.send_event(e);
+                }
+                BevyWindowEvent::PinchGesture(e) => {
+                    world.send_event(e);
+                }
+                BevyWindowEvent::RotationGesture(e) => {
+                    world.send_event(e);
+                }
+                BevyWindowEvent::DoubleTapGesture(e) => {
+                    world.send_event(e);
+                }
+                BevyWindowEvent::PanGesture(e) => {
+                    world.send_event(e);
+                }
+                BevyWindowEvent::TouchInput(e) => {
+                    world.send_event(e);
+                }
+                BevyWindowEvent::KeyboardInput(e) => {
+                    world.send_event(e);
+                }
+                BevyWindowEvent::KeyboardFocusLost(e) => {
+                    world.send_event(e);
+                }
+            }
+        }
+
+        if !buffered_events.is_empty() {
+            world
+                .resource_mut::<Events<BevyWindowEvent>>()
+                .send_batch(buffered_events);
         }
     }
 }
@@ -212,10 +319,8 @@ impl SeatHandler for SmithayRunnerState {
             self.keyboard = Some(keyboard);
         }
         if capability == Capability::Pointer && self.pointer.is_none() {
-            // let pointer = self.seat_state.get_pointer(qh, &seat).unwrap();
-            // self.pointer = Some(pointer);
-
-            info!("Pointer Attached");
+            let pointer = self.seat_state.get_pointer(qh, &seat).unwrap();
+            self.pointer = Some(pointer);
         }
         if capability == Capability::Touch && self.touch.is_none() {
             // let touch = self.seat_state.get_touch(qh, &seat).unwrap();
