@@ -25,11 +25,31 @@ use crate::state::SmithayRunnerState;
 
 #[derive(Debug, Resource, Component, Clone)]
 pub struct LayerShellSettings {
+    /// Defines where the layer surface should be anchored to the screen.
+    ///
+    /// You can anchor the layer surface to any combination of the top, bottom, left, and right edges of the screen.
     pub anchor: Anchor,
+    /// Defines the size of the layer surface in pixels.
     pub size: (u32, u32),
+    /// Defines the amount of exclusive space the layer surface should reserve.
+    ///
+    /// Other surfaces will not be placed in this area. A negative value means that the layer surface
+    /// will not reserve any exclusive space.
     pub exclusive_zone: i32,
+    /// Defines the margins for the layer surface.
+    ///
+    /// Margins are specified in the order: top, right, bottom, left.
     pub margin: (i32, i32, i32, i32),
+    /// Defines how the layer surface should handle keyboard interactivity.
+    ///
+    /// If set to `Exclusive`, the layer surface will receive all keyboard input.
+    /// If set to `OnDemand`, the layer surface will only receive keyboard input when it is focused.
+    /// If set to `None`, the layer surface will never receive keyboard input.
     pub keyboard_interactivity: KeyboardInteractivity,
+    /// Defines the layer that the surface should be placed on.
+    ///
+    /// The layer determines the stacking order of the surface. Surfaces on higher layers are
+    /// always drawn on top of surfaces on lower layers.
     pub layer: Layer,
 }
 

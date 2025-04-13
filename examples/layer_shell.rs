@@ -12,13 +12,13 @@ fn main() {
             DefaultPlugins.build().disable::<WinitPlugin>(),
             SmithayPlugin,
         ))
-        // Only run the app when there is user input. This will significantly reduce CPU/GPU use.
         .insert_resource(LayerShellSettings {
-            anchor: Anchor::BOTTOM,
-            layer: Layer::Background,
-            keyboard_interactivity: bevy_smithay::prelude::KeyboardInteractivity::OnDemand,
-            exclusive_zone: 720,
-            ..Default::default()
+            anchor: Anchor::BOTTOM,   // Anchor to the bottom of the screen
+            layer: Layer::Background, // Set the layer to background
+            keyboard_interactivity: bevy_smithay::prelude::KeyboardInteractivity::OnDemand, // Enable keyboard interactivity on demand
+            exclusive_zone: 720, // Reserve 720 pixels at the bottom of the screen
+            size: Default::default(), // Use default size
+            margin: Default::default(), // Use default margin
         })
         .add_systems(Startup, setup)
         .add_systems(Update, (button_system, exit_on_esc))
