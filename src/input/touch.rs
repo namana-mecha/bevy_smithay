@@ -146,7 +146,7 @@ impl TouchHandler for SmithayRunnerState {
         if let Some(touch_data) = self.active_touches.get_mut(&id) {
             touch_data.1 = logical_position;
         } else {
-            // Should technically not happen if the first check passed, but belts and braces
+            warn!("touch motion event occurred without a touch down event");
             return;
         }
 
