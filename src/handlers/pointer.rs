@@ -9,6 +9,7 @@ use smithay_client_toolkit::{
 
 use crate::{smithay_windows::SmithayWindows, state::SmithayRunnerState};
 
+/// Converts a u32 button code to a Bevy MouseButton.
 fn convert_to_mouse_button(button: u32) -> MouseButton {
     match button {
         272 => MouseButton::Left,
@@ -21,6 +22,7 @@ fn convert_to_mouse_button(button: u32) -> MouseButton {
 }
 
 impl PointerHandler for SmithayRunnerState {
+    /// Handles pointer frame events from Smithay.
     fn pointer_frame(
         &mut self,
         _: &smithay_client_toolkit::reexports::client::Connection,
@@ -31,11 +33,10 @@ impl PointerHandler for SmithayRunnerState {
         for event in events {
             let smithay_windows = self.world().non_send_resource::<SmithayWindows>();
             let window_id = event.surface.id();
-            let entity = smithay_windows.smithay_to_entity.get(&window_id);
-            if entity.is_none() {
-                return;
-            }
-            let entity = *entity.unwrap();
+            let entity = *smithay_windows
+                .smithay_to_entity
+                .get(&window_id)
+                .expect("no window created for the keyboard surface!");
             let window = self.world().get::<Window>(entity).unwrap().clone();
             let mut position = bevy::math::Vec2 {
                 x: event.position.0 as f32,
@@ -80,9 +81,6 @@ impl PointerHandler for SmithayRunnerState {
                     window: entity,
                 }
                 .into(),
-                _ => {
-                    todo!("mouse event!")
-                }
             };
             self.bevy_window_events.push(pointer_event);
         }

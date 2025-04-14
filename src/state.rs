@@ -323,8 +323,8 @@ impl SeatHandler for SmithayRunnerState {
             self.pointer = Some(pointer);
         }
         if capability == Capability::Touch && self.touch.is_none() {
-            // let touch = self.seat_state.get_touch(qh, &seat).unwrap();
-            // self.touch = Some(touch);
+            let touch = self.seat_state.get_touch(qh, &seat).unwrap();
+            self.touch = Some(touch);
 
             info!("Touchscreen Attached");
         }

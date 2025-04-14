@@ -1,5 +1,5 @@
 use bevy::input::touch::{TouchInput, TouchPhase};
-use bevy::log;
+use bevy::log::{self, warn};
 use bevy::math::Vec2;
 use bevy::window::{Window, WindowEvent};
 use smithay_client_toolkit::reexports::client::Proxy;
@@ -17,6 +17,7 @@ use crate::smithay_windows::SmithayWindows;
 use crate::state::SmithayRunnerState; // Needed for tracking active touches
 
 impl TouchHandler for SmithayRunnerState {
+    /// Handles the "down" event when a touch point is pressed on the surface.
     fn down(
         &mut self,
         _conn: &Connection,
@@ -36,7 +37,7 @@ impl TouchHandler for SmithayRunnerState {
             if let Some(entity) = smithay_windows.smithay_to_entity.get(&window_id).copied() {
                 entity
             } else {
-                log::warn!("Touch down event on unknown surface: {:?}", window_id);
+                warn!("touch down event on unknown surface: {:?}", window_id);
                 return;
             }
         };
@@ -46,8 +47,8 @@ impl TouchHandler for SmithayRunnerState {
             if let Some(window) = self.world().get::<Window>(entity) {
                 window.scale_factor()
             } else {
-                log::warn!(
-                    "Touch down event for entity {:?} without a Window component",
+                warn!(
+                    "touch down event for entity {:?} without a Window component",
                     entity
                 );
                 return;
@@ -72,10 +73,9 @@ impl TouchHandler for SmithayRunnerState {
         // Send the event (adapt this line based on how you send events)
         self.bevy_window_events
             .send(WindowEvent::TouchInput(bevy_event));
-        // Or if you have a specific TouchInput writer:
-        // self.touch_events.send(bevy_event);
     }
 
+    /// Handles the "up" event when a touch point is released from the surface.
     fn up(
         &mut self,
         _conn: &Connection,
@@ -103,12 +103,13 @@ impl TouchHandler for SmithayRunnerState {
         } else {
             // This might happen if the 'down' event was missed or occurred on a different surface
             log::warn!(
-                "Touch up event for unknown or already removed touch ID: {}",
+                "touch up event for unknown or already removed touch ID: {}",
                 id
             );
         }
     }
 
+    /// Handles the "motion" event when a touch point is moved on the surface.
     fn motion(
         &mut self,
         _conn: &Connection,
@@ -122,7 +123,7 @@ impl TouchHandler for SmithayRunnerState {
         let entity = if let Some((entity, _)) = self.active_touches.get(&id).copied() {
             entity
         } else {
-            log::warn!("Touch motion event for unknown touch ID: {}", id);
+            warn!("touch motion event for unknown touch ID: {}", id);
             return;
         };
 
@@ -131,11 +132,10 @@ impl TouchHandler for SmithayRunnerState {
             if let Some(window) = self.world().get::<Window>(entity) {
                 window.scale_factor()
             } else {
-                log::warn!(
-                    "Touch motion event for entity {:?} without a Window component",
+                warn!(
+                    "touch motion event for entity {:?} without a Window component",
                     entity
                 );
-                // We could remove the touch id here, but it might be valid if the window is recreated fast
                 return;
             }
         };
@@ -151,7 +151,7 @@ impl TouchHandler for SmithayRunnerState {
         }
 
         // Create and send the Bevy touch event
-        let bevy_event = TouchInput {
+        let bevy_touch_event = TouchInput {
             phase: TouchPhase::Moved,
             position: logical_position,
             force: None,
@@ -161,35 +161,37 @@ impl TouchHandler for SmithayRunnerState {
 
         // Send the event
         self.bevy_window_events
-            .send(WindowEvent::TouchInput(bevy_event));
+            .send(WindowEvent::TouchInput(bevy_touch_event));
     }
 
+    /// Handles the "cancel" event when a touch sequence is canceled.
     fn cancel(&mut self, _conn: &Connection, _qh: &QueueHandle<Self>, _touch: &WlTouch) {
-        // // Retrieve the entity and last known position for the touch ID, then remove it
-        // let touch_data = self.active_touches.remove(&id);
-        //
-        // if let Some((entity, last_position)) = touch_data {
-        //     // Create and send the Bevy touch event
-        //     let bevy_event = TouchInput {
-        //         phase: TouchPhase::Canceled,
-        //         position: last_position, // Use the stored last position
-        //         force: None,
-        //         id: id as u64,
-        //         window: entity,
-        //     };
-        //     // Send the event
-        //     self.bevy_window_events
-        //         .send(WindowEvent::TouchInput(bevy_event));
-        // } else {
-        //     // eprintln!("Touch cancel event for unknown or already removed touch ID: {}", id);
-        //     return;
-        // }
+        for id in self.active_touches.keys().copied().collect::<Vec<_>>() {
+            let touch_data = self.active_touches.remove(&id);
+
+            if let Some((entity, last_position)) = touch_data {
+                // Create and send the Bevy touch event
+                let bevy_event = TouchInput {
+                    phase: TouchPhase::Canceled,
+                    position: last_position, // Use the stored last position
+                    force: None,
+                    id: id as u64,
+                    window: entity,
+                };
+                // Send the event
+                self.bevy_window_events
+                    .send(WindowEvent::TouchInput(bevy_event));
+            } else {
+                warn!(
+                    "touch cancel event for unknown or already removed touch ID: {}",
+                    id
+                );
+                return;
+            }
+        }
     }
 
-    // Optional methods for Wayland protocols >= 6 (wl_touch)
-    // Implement these if you need shape or orientation data and have the corresponding
-    // Bevy event types or state to update.
-
+    /// Handles the "shape" event when the shape of a touch point changes.
     fn shape(
         &mut self,
         _conn: &Connection,
@@ -202,6 +204,7 @@ impl TouchHandler for SmithayRunnerState {
         // Handle touch shape change if needed
     }
 
+    /// Handles the "orientation" event when the orientation of a touch point changes.
     fn orientation(
         &mut self,
         _conn: &Connection,

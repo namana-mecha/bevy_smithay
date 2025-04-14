@@ -10,6 +10,7 @@ use smithay_client_toolkit::{
     seat::keyboard::{KeyEvent, KeyboardHandler, Keysym},
 };
 
+/// Converts a Smithay keyboard event to a Bevy keyboard input event.
 fn convert_keyboard_event(
     event: KeyEvent,
     entity: Entity,
@@ -24,6 +25,7 @@ fn convert_keyboard_event(
     }
 }
 
+/// Converts a Smithay Keysym to a Bevy Key.
 fn convert_to_logical_key(keysym: Keysym) -> bevy::input::keyboard::Key {
     // First, attempt to get the character representation based on keyboard layout.
     if let Some(c) = keysym.key_char() {
@@ -94,26 +96,6 @@ fn convert_to_logical_key(keysym: Keysym) -> bevy::input::keyboard::Key {
         Keysym::Caps_Lock => Key::CapsLock,
         Keysym::Num_Lock => Key::NumLock,
 
-        // Numpad Specific Keys (assuming key_char didn't handle them, e.g., if NumLock is off or they are distinct)
-        // Keysym::KP_0 => Key::Numpad0,
-        // Keysym::KP_1 => Key::Numpad1,
-        // Keysym::KP_2 => Key::Numpad2,
-        // Keysym::KP_3 => Key::Numpad3,
-        // Keysym::KP_4 => Key::Numpad4,
-        // Keysym::KP_5 => Key::Numpad5,
-        // Keysym::KP_6 => Key::Numpad6,
-        // Keysym::KP_7 => Key::Numpad7,
-        // Keysym::KP_8 => Key::Numpad8,
-        // Keysym::KP_9 => Key::Numpad9,
-        // Keysym::KP_Add => Key::NumpadAdd,
-        // Keysym::KP_Subtract => Key::NumpadSubtract,
-        // Keysym::KP_Multiply => Key::NumpadMultiply,
-        // Keysym::KP_Divide => Key::NumpadDivide,
-        // Keysym::KP_Decimal => Key::NumpadDecimal,
-        // Keysym::KP_Separator => Key::NumpadComma, // Bevy uses NumpadComma for separator
-        // Keysym::KP_Equal => Key::NumpadEqual,
-        // KP_Enter is handled above with Return
-
         // Keys that *might* have produced a character but key_char() returned None.
         // This could happen for dead keys, IME input, or if key_char() implementation is limited.
         // We need a fallback. Panicking with todo!() highlights these cases during development.
@@ -181,14 +163,12 @@ fn convert_to_logical_key(keysym: Keysym) -> bevy::input::keyboard::Key {
 
         // Catch-all for any other Keysym variants not handled above.
         _ => {
-            warn!("Unhandled keysym variant: {:?}", keysym);
-            // Again, no perfect fallback in Bevy's Key enum. Panic during development.
             todo!("Unhandled keysym variant: {:?}", keysym)
-            // In production, you might ignore, log, or map to a default if appropriate.
         }
     }
 }
 
+/// Converts a Smithay Keysym to a Bevy KeyCode.
 fn convert_to_key_code(keysym: Keysym) -> bevy::prelude::KeyCode {
     match keysym {
         // Letters
@@ -373,6 +353,7 @@ fn convert_to_key_code(keysym: Keysym) -> bevy::prelude::KeyCode {
 }
 
 impl KeyboardHandler for SmithayRunnerState {
+    /// Called when the keyboard focus enters a surface.
     fn enter(
         &mut self,
         _: &smithay_client_toolkit::reexports::client::Connection,
@@ -383,9 +364,11 @@ impl KeyboardHandler for SmithayRunnerState {
         _: &[u32],
         _: &[smithay_client_toolkit::seat::keyboard::Keysym],
     ) {
+        // Hold the active keyboard surface when focus enters.
         self.active_keyboard_surface = Some(wl_surface.clone());
     }
 
+    /// Called when the keyboard focus leaves a surface.
     fn leave(
         &mut self,
         _: &smithay_client_toolkit::reexports::client::Connection,
@@ -394,6 +377,7 @@ impl KeyboardHandler for SmithayRunnerState {
         _: &smithay_client_toolkit::reexports::client::protocol::wl_surface::WlSurface,
         _: u32,
     ) {
+        // Release the active keyboard surface when focus leaves.
         if let Some(active_surface) = &mut self.active_keyboard_surface {
             if active_surface.id() == wl_surface.id() {
                 self.active_keyboard_surface.take();
@@ -401,6 +385,7 @@ impl KeyboardHandler for SmithayRunnerState {
         }
     }
 
+    /// Called when a key is pressed.
     fn press_key(
         &mut self,
         _: &smithay_client_toolkit::reexports::client::Connection,
@@ -419,10 +404,11 @@ impl KeyboardHandler for SmithayRunnerState {
             let bevy_event = convert_keyboard_event(event, *entity, ButtonState::Pressed);
             self.bevy_window_events.send(bevy_event);
         } else {
-            panic!("There is no window available to send keyboard events!");
+            warn!("there is no active window to send keyboard events!");
         }
     }
 
+    /// Called when a key is released.
     fn release_key(
         &mut self,
         _: &smithay_client_toolkit::reexports::client::Connection,
@@ -445,6 +431,7 @@ impl KeyboardHandler for SmithayRunnerState {
         }
     }
 
+    /// Called when the keyboard modifiers are updated.
     fn update_modifiers(
         &mut self,
         _: &smithay_client_toolkit::reexports::client::Connection,

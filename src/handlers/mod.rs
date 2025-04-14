@@ -1,3 +1,3 @@
-mod keyboard_handler;
-mod pointer_handler;
-mod touch_handler;
+mod keyboard;
+mod pointer;
+mod touch;
