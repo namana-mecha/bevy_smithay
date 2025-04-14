@@ -1,7 +1,10 @@
 use std::time::Duration;
 
 use bevy::{
-    app::PluginsState, ecs::system::SystemState, prelude::*, window::WindowEvent as BevyWindowEvent,
+    app::PluginsState,
+    ecs::system::SystemState,
+    prelude::*,
+    window::{WindowEvent as BevyWindowEvent, WindowScaleFactorChanged},
 };
 
 use smithay_client_toolkit::{
@@ -12,7 +15,7 @@ use smithay_client_toolkit::{
         calloop::EventLoop,
         calloop_wayland_source::WaylandSource,
         client::{
-            Connection,
+            Connection, Proxy,
             globals::registry_queue_init,
             protocol::{wl_keyboard, wl_pointer, wl_surface::WlSurface, wl_touch},
         },
@@ -22,7 +25,7 @@ use smithay_client_toolkit::{
     seat::{Capability, SeatHandler, SeatState},
 };
 
-use crate::{CreateWindowParams, system::create_windows};
+use crate::{CreateWindowParams, smithay_windows::SmithayWindows, system::create_windows};
 
 pub fn smithay_runner(mut app: App) -> AppExit {
     if app.plugins_state() == PluginsState::Ready {
@@ -222,9 +225,21 @@ impl CompositorHandler for SmithayRunnerState {
         &mut self,
         _conn: &Connection,
         _qh: &smithay_client_toolkit::reexports::client::QueueHandle<Self>,
-        _surface: &smithay_client_toolkit::reexports::client::protocol::wl_surface::WlSurface,
-        _new_factor: i32,
+        surface: &smithay_client_toolkit::reexports::client::protocol::wl_surface::WlSurface,
+        new_factor: i32,
     ) {
+        let smithay_windows = self.world().non_send_resource::<SmithayWindows>();
+        let entity = *smithay_windows
+            .smithay_to_entity
+            .get(&surface.id())
+            .expect("no window created for the surface!");
+        self.bevy_window_events
+            .push(BevyWindowEvent::WindowScaleFactorChanged(
+                WindowScaleFactorChanged {
+                    window: entity,
+                    scale_factor: new_factor as f64,
+                },
+            ))
     }
 
     fn transform_changed(
