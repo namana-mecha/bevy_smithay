@@ -1,5 +1,8 @@
 use bevy::{
-    input::{ButtonState, mouse::MouseButtonInput},
+    input::{
+        ButtonState,
+        mouse::{MouseButtonInput, MouseScrollUnit, MouseWheel},
+    },
     prelude::MouseButton,
     window::{CursorEntered, CursorLeft, CursorMoved, Window, WindowEvent},
 };
@@ -78,6 +81,17 @@ impl PointerHandler for SmithayRunnerState {
                 } => MouseButtonInput {
                     button: convert_to_mouse_button(button),
                     state: ButtonState::Released,
+                    window: entity,
+                }
+                .into(),
+                smithay_client_toolkit::seat::pointer::PointerEventKind::Axis {
+                    horizontal,
+                    vertical,
+                    ..
+                } => MouseWheel {
+                    unit: MouseScrollUnit::Pixel,
+                    x: horizontal.absolute as f32,
+                    y: vertical.absolute as f32,
                     window: entity,
                 }
                 .into(),
