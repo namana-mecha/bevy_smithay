@@ -29,7 +29,7 @@ impl TouchHandler for SmithayRunnerState {
         id: i32,
         position: (f64, f64),
     ) {
-        let entity = {
+        let window_entity = {
             let smithay_windows = self.world().non_send_resource::<SmithayWindows>();
             let window_id = surface.id();
 
@@ -44,12 +44,12 @@ impl TouchHandler for SmithayRunnerState {
 
         let scale_factor = {
             // Get the window component to access scale factor
-            if let Some(window) = self.world().get::<Window>(entity) {
+            if let Some(window) = self.world().get::<Window>(window_entity) {
                 window.scale_factor()
             } else {
                 warn!(
                     "touch down event for entity {:?} without a Window component",
-                    entity
+                    window_entity
                 );
                 return;
             }
@@ -58,7 +58,8 @@ impl TouchHandler for SmithayRunnerState {
         let logical_position = Vec2::new(position.0 as f32, position.1 as f32) / scale_factor;
 
         // Store the active touch point's entity and logical position
-        self.active_touches.insert(id, (entity, logical_position));
+        self.active_touches
+            .insert(id, (window_entity, logical_position));
 
         // Create and send the Bevy touch event
         let bevy_event = TouchInput {
@@ -67,7 +68,7 @@ impl TouchHandler for SmithayRunnerState {
             // Force is not directly available in basic Wayland touch events
             force: None,
             id: id as u64, // Bevy uses u64 for touch IDs
-            window: entity,
+            window: window_entity,
         };
 
         // Send the event (adapt this line based on how you send events)

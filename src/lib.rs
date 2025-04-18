@@ -5,7 +5,7 @@ use bevy::{
 use shells::layer_shell::LayerShellSettings;
 use smithay_windows::SmithayWindows;
 
-mod handlers;
+mod input;
 mod shells;
 mod smithay_windows;
 mod state;

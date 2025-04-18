@@ -2,7 +2,6 @@
 name: Feature Request
 about: Propose a new feature!
 title: ''
-labels: C-Feature, S-Needs-Triage
 assignees: ''
 ---
 
