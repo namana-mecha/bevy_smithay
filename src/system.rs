@@ -8,13 +8,10 @@ use bevy::{
         WindowWrapper,
     },
 };
-use smithay_client_toolkit::{
-    reexports::client::{Connection, QueueHandle, globals::GlobalList},
-    shell::WaylandSurface,
-};
+use smithay_client_toolkit::reexports::client::{Connection, QueueHandle, globals::GlobalList};
 
 use crate::{
-    CreateWindowParams,
+    CreateWindowParams, SmithayWindowType,
     shells::layer_shell::LayerShellSettings,
     smithay_windows::{SmithayWindow, SmithayWindows},
     state::SmithayRunnerState,
@@ -27,29 +24,24 @@ pub(crate) fn create_windows<F: QueryFilter + 'static>(
         mut commands,
         mut created_windows,
         mut smithay_windows,
-        mut window_settings,
         mut window_created_events,
     ): SystemParamItem<CreateWindowParams<F>>,
 ) {
     let mut smithay_window;
-    for (entity, window, handle_holder) in &mut created_windows {
+    for (entity, _, window_type, handle_holder) in &mut created_windows {
         if smithay_windows.entity_to_smithay.contains_key(&entity) {
             continue;
         }
-        let window_settings = if let Some(window_settings) = window_settings.as_mut() {
-            window_settings.size = (window.physical_width(), window.physical_height());
-            window_settings
-        } else {
-            &LayerShellSettings {
-                size: (window.physical_size().x, window.physical_size().y),
-                ..Default::default()
-            }
-        };
         if smithay_windows.windows.is_empty() {
             commands.entity(entity).insert_if_new(PrimaryWindow);
         }
-        smithay_window =
-            smithay_windows.create_window(entity, window_settings, globals, qh, conn.clone());
+        smithay_window = smithay_windows.create_window(
+            entity,
+            window_type.unwrap_or(&SmithayWindowType::default()),
+            globals,
+            qh,
+            conn.clone(),
+        );
 
         let mut wrapper: Option<_> = None;
         if let Ok(handle_wrapper) = RawHandleWrapper::new(smithay_window) {
@@ -58,13 +50,10 @@ pub(crate) fn create_windows<F: QueryFilter + 'static>(
                 *handle_holder.0.lock().unwrap() = Some(handle_wrapper);
             }
         }
-        commands
-            .entity(entity)
-            .insert(wrapper.unwrap())
-            .insert(window_settings.clone());
+        commands.entity(entity).insert(wrapper.unwrap());
 
         info!("Window created! {}", entity);
-        window_created_events.send(WindowCreated { window: entity });
+        window_created_events.write(WindowCreated { window: entity });
     }
 }
 
@@ -83,16 +72,16 @@ pub(crate) fn changed_windows(
             .unwrap()
             .clone();
         let window = smithay_windows.windows.get_mut(&window_id).unwrap();
-        let surface = window.layer_surface();
-        surface.set_exclusive_zone(layer_shell_settings.exclusive_zone);
-        surface.set_size(layer_shell_settings.size.0, layer_shell_settings.size.1);
-        surface.set_margin(
-            layer_shell_settings.margin.0,
-            layer_shell_settings.margin.1,
-            layer_shell_settings.margin.2,
-            layer_shell_settings.margin.3,
-        );
-        surface.commit();
+        // let surface = window.layer_surface();
+        // surface.set_exclusive_zone(layer_shell_settings.exclusive_zone);
+        // surface.set_size(layer_shell_settings.size.0, layer_shell_settings.size.1);
+        // surface.set_margin(
+        //     layer_shell_settings.margin.0,
+        //     layer_shell_settings.margin.1,
+        //     layer_shell_settings.margin.2,
+        //     layer_shell_settings.margin.3,
+        // );
+        // surface.commit();
     }
 }
 
@@ -111,7 +100,7 @@ pub(crate) fn despawn_windows(
         drop(window);
     }
     for window in closing.iter() {
-        closing_events.send(WindowClosing { window });
+        closing_events.write(WindowClosing { window });
     }
     for window in closed.read() {
         info!("Closing window {}", window);
@@ -123,13 +112,13 @@ pub(crate) fn despawn_windows(
                 }
             }
         }
-        closed_events.send(WindowClosed { window });
+        closed_events.write(WindowClosed { window });
     }
 
     if !exit_events.is_empty() {
         exit_events.clear();
         for window in window_entities.iter() {
-            closing_events.send(WindowClosing { window });
+            closing_events.write(WindowClosing { window });
         }
     }
 }

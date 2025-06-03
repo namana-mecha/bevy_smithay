@@ -50,16 +50,18 @@ pkgs.mkShell rec {
     yq # for tomlq below
     rustup
 
+    openssl
+
     cargo-apk cargo-ndk
   ];
 
   shellHook = ''
-    export RUSTC_VERSION="1.85"
+    export RUSTC_VERSION="1.87"
     export PATH="$PATH:''${CARGO_HOME:-~/.cargo}/bin"
     export PATH="$PATH:''${RUSTUP_HOME:-~/.rustup/toolchains/$RUSTC_VERSION-x86_64-unknown-linux/bin}"
     export LD_LIBRARY_PATH="$LD_LIBRARY_PATH:${builtins.toString (pkgs.lib.makeLibraryPath buildInputs)}";
 
-    rustup default $RUSTC_VERSION
+    rustup default $RUST_VERSION
     rustup component add rust-src rust-analyzer
     rustup target add aarch64-linux-android
   '';

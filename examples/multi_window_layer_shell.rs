@@ -2,8 +2,8 @@
 
 use bevy::{color::palettes::basic::*, prelude::*, window::WindowCreated, winit::WinitPlugin};
 use bevy_smithay::{
-    SmithayPlugin,
-    prelude::{Anchor, Layer, LayerShellSettings},
+    SmithayPlugin, SmithayWindowType,
+    prelude::layer_shell::{Anchor, Layer, LayerShellSettings},
 };
 
 #[derive(Resource, Default)]
@@ -16,16 +16,15 @@ fn main() {
     App::new()
         .add_plugins((
             DefaultPlugins.build().disable::<WinitPlugin>(),
-            SmithayPlugin,
+            SmithayPlugin {
+                primary_window_type: SmithayWindowType::LayerShell {
+                    settings: LayerShellSettings {
+                        exclusive_zone: 720,
+                        ..default()
+                    },
+                },
+            },
         ))
-        .insert_resource(LayerShellSettings {
-            anchor: Anchor::TOP, // Anchor to the bottom of the screen
-            layer: Layer::Top,   // Set the layer to background
-            keyboard_interactivity: bevy_smithay::prelude::KeyboardInteractivity::OnDemand, // Enable keyboard interactivity on demand
-            exclusive_zone: 720, // Reserve 720 pixels at the bottom of the screen
-            size: Default::default(), // Use default size
-            margin: Default::default(), // Use default margin
-        })
         .init_resource::<NewWindowInfo>()
         .add_systems(Startup, setup)
         .add_systems(Update, (spawn_new_window, setup_new_window))
@@ -37,23 +36,29 @@ const NORMAL_BUTTON: Color = Color::srgb(0.15, 0.15, 0.15);
 const HOVERED_BUTTON: Color = Color::srgb(0.25, 0.25, 0.25);
 const PRESSED_BUTTON: Color = Color::srgb(0.35, 0.75, 0.35);
 
+#[derive(Component)]
+struct StatusBarWindow;
+
 fn spawn_new_window(
     mut commands: Commands,
     keyboard_input: Res<ButtonInput<KeyCode>>,
     mut new_window_info: ResMut<NewWindowInfo>,
-    mut layer_shell_settings: ResMut<LayerShellSettings>,
 ) {
     if keyboard_input.just_pressed(KeyCode::KeyN) {
-        layer_shell_settings.size = (400, 250);
-        layer_shell_settings.exclusive_zone = 0;
         if new_window_info.entity.is_none() {
             info!("Spawning new UI-only window...");
             let new_window_entity = commands
-                .spawn(Window {
-                    title: "UI Only Window".to_string(),
-                    resolution: (400., 250.).into(),
-                    ..default()
-                })
+                .spawn((
+                    StatusBarWindow,
+                    Window {
+                        title: "UI Only Window".to_string(),
+                        resolution: (400., 250.).into(),
+                        ..default()
+                    },
+                    SmithayWindowType::LayerShell {
+                        settings: default(),
+                    },
+                ))
                 .id();
             new_window_info.entity = Some(new_window_entity);
             new_window_info.is_setup_pending = true;
@@ -77,16 +82,16 @@ fn setup_new_window(
                 event.window
             );
 
-            commands.spawn((Camera2dBundle {
-                camera: Camera {
+            commands.spawn((
+                Camera {
                     target: bevy::render::camera::RenderTarget::Window(
                         bevy::window::WindowRef::Entity(event.window),
                     ),
                     clear_color: ClearColorConfig::Custom(Color::default()),
                     ..default()
                 },
-                ..default()
-            },));
+                Camera2d,
+            ));
             new_window_info.is_setup_pending = false; // Mark as setup complete
         }
     }

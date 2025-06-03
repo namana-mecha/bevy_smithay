@@ -1,27 +1,36 @@
 #![allow(warnings)]
-
-use bevy::{color::palettes::basic::*, prelude::*, winit::WinitPlugin};
-use bevy_smithay::{
-    SmithayPlugin,
-    prelude::{Anchor, Layer, LayerShellSettings},
+use bevy::{
+    color::palettes::basic::*,
+    prelude::*,
+    window::{PrimaryWindow, WindowCreated},
+    winit::WinitPlugin,
 };
+use bevy_simple_subsecond_system::prelude::*;
+use bevy_smithay::{
+    SmithayPlugin, SmithayWindowType,
+    prelude::layer_shell::{Anchor, Layer, LayerShellSettings},
+};
+
+#[derive(Resource, Default)]
+struct NewWindowInfo {
+    entity: Option<Entity>,
+    is_setup_pending: bool,
+}
 
 fn main() {
     App::new()
         .add_plugins((
             DefaultPlugins.build().disable::<WinitPlugin>(),
-            SmithayPlugin,
+            SmithayPlugin {
+                primary_window_type: SmithayWindowType::LayerShell {
+                    settings: LayerShellSettings { ..default() },
+                },
+            },
         ))
-        .insert_resource(LayerShellSettings {
-            anchor: Anchor::BOTTOM,   // Anchor to the bottom of the screen
-            layer: Layer::Background, // Set the layer to background
-            keyboard_interactivity: bevy_smithay::prelude::KeyboardInteractivity::OnDemand, // Enable keyboard interactivity on demand
-            exclusive_zone: 720, // Reserve 720 pixels at the bottom of the screen
-            size: Default::default(), // Use default size
-            margin: Default::default(), // Use default margin
-        })
+        .init_resource::<NewWindowInfo>()
+        .add_plugins(SimpleSubsecondPlugin::default())
         .add_systems(Startup, setup)
-        .add_systems(Update, (button_system, exit_on_esc))
+        .add_systems(Update, (button_system, exit_on_esc, setup_new_window))
         .run();
 }
 
@@ -35,7 +44,9 @@ fn exit_on_esc(keys: Res<ButtonInput<KeyCode>>) {
     }
 }
 
+#[hot]
 fn button_system(
+    mut commands: Commands,
     mut interaction_query: Query<
         (
             &Interaction,
@@ -45,7 +56,10 @@ fn button_system(
         ),
         (Changed<Interaction>, With<Button>),
     >,
+    mouse_button: Res<ButtonInput<MouseButton>>,
+    mut new_window_info: ResMut<NewWindowInfo>,
     mut text_query: Query<&mut Text>,
+    mut primary_window_entity: Single<Entity, With<PrimaryWindow>>,
 ) {
     for (interaction, mut color, mut border_color, children) in &mut interaction_query {
         let mut text = text_query.get_mut(children[0]).unwrap();
@@ -53,7 +67,29 @@ fn button_system(
             Interaction::Pressed => {
                 **text = "Press".to_string();
                 *color = PRESSED_BUTTON.into();
-                border_color.0 = RED.into();
+                border_color.0 = Color::WHITE;
+                if mouse_button.just_pressed(MouseButton::Left) {
+                    if let Some(window_entity) = new_window_info.entity {
+                        commands.entity(window_entity).despawn();
+                        new_window_info.entity = None;
+                        continue;
+                    }
+                    let new_window_entity = commands
+                        .spawn((
+                            Window {
+                                title: "UI Only Window".to_string(),
+                                resolution: (400., 250.).into(),
+                                ..default()
+                            },
+                            SmithayWindowType::SubSurface {
+                                parent: *primary_window_entity,
+                                position: (250, 250),
+                            },
+                        ))
+                        .id();
+                    new_window_info.entity = Some(new_window_entity);
+                    new_window_info.is_setup_pending = true;
+                }
             }
             Interaction::Hovered => {
                 **text = "Hover".to_string();
@@ -65,6 +101,34 @@ fn button_system(
                 *color = NORMAL_BUTTON.into();
                 border_color.0 = Color::BLACK;
             }
+        }
+    }
+}
+
+fn setup_new_window(
+    mut commands: Commands,
+    mut window_created_events: EventReader<WindowCreated>,
+    mut new_window_info: ResMut<NewWindowInfo>,
+    asset_server: Res<AssetServer>, // For fonts
+) {
+    for event in window_created_events.read() {
+        if Some(event.window) == new_window_info.entity && new_window_info.is_setup_pending {
+            info!(
+                "New UI window created (ID: {:?}), setting up its camera and UI.",
+                event.window
+            );
+
+            commands.spawn((
+                Camera {
+                    target: bevy::render::camera::RenderTarget::Window(
+                        bevy::window::WindowRef::Entity(event.window),
+                    ),
+                    clear_color: ClearColorConfig::Custom(Color::WHITE),
+                    ..default()
+                },
+                Camera2d,
+            ));
+            new_window_info.is_setup_pending = false; // Mark as setup complete
         }
     }
 }

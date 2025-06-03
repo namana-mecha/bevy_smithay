@@ -66,6 +66,7 @@ pub fn smithay_runner(mut app: App) -> AppExit {
         let mut create_window = SystemState::<CreateWindowParams<Added<Window>>>::from_world(
             smithay_runner_state.world_mut(),
         );
+
         create_windows(
             &globals,
             &qh,

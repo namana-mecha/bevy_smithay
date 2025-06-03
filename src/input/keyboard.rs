@@ -18,6 +18,7 @@ fn convert_keyboard_event(
 ) -> bevy::input::keyboard::KeyboardInput {
     KeyboardInput {
         state,
+        text: None,
         window: entity,
         key_code: convert_to_key_code(event.keysym),
         logical_key: convert_to_logical_key(event.keysym),

@@ -23,7 +23,7 @@ pub use smithay_client_toolkit::shell::wlr_layer::{Anchor, KeyboardInteractivity
 
 use crate::state::SmithayRunnerState;
 
-#[derive(Debug, Resource, Component, Clone)]
+#[derive(Debug, Component, Clone)]
 pub struct LayerShellSettings {
     /// Defines where the layer surface should be anchored to the screen.
     ///
@@ -60,7 +60,7 @@ impl Default for LayerShellSettings {
             exclusive_zone: Default::default(),
             margin: Default::default(),
             size: (256, 256),
-            keyboard_interactivity: Default::default(),
+            keyboard_interactivity: KeyboardInteractivity::OnDemand,
             layer: Layer::Top,
         }
     }
